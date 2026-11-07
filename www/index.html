@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#241A4F">
+<title>家长端</title>
+<style>
+  :root{
+    --bg1:#241A4F; --bg2:#0B1020; --glow1:#7C5CFF; --glow2:#36C6F4;
+    --card:rgba(255,255,255,.10); --stroke:rgba(255,255,255,.22);
+    --fg:#fff; --dim:#B9C0D4; --accent:#7C5CFF; --on-accent:#fff;
+  }
+  body[data-theme="midnight"]{
+    --bg1:#101A22; --bg2:#070A0E; --glow1:#1F8A70; --glow2:#2D6CDF;
+    --card:rgba(255,255,255,.08); --stroke:rgba(255,255,255,.18);
+    --fg:#fff; --dim:#9AA7B4; --accent:#38D39F; --on-accent:#04221A;
+  }
+  body[data-theme="mist"]{
+    --bg1:#EEF3FA; --bg2:#D9E3F0; --glow1:#fff; --glow2:#BBD4F5;
+    --card:rgba(255,255,255,.62); --stroke:rgba(255,255,255,.9);
+    --fg:#1B2430; --dim:#5A6B7E; --accent:#3B82F6; --on-accent:#fff;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{
+    margin:0;padding:18px 16px calc(96px + env(safe-area-inset-bottom));
+    font:15px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    color:var(--fg);min-height:100vh;
+    background:
+      radial-gradient(70% 50% at 85% 0%, color-mix(in srgb, var(--glow1) 55%, transparent), transparent 70%),
+      radial-gradient(60% 45% at 5% 100%, color-mix(in srgb, var(--glow2) 45%, transparent), transparent 70%),
+      linear-gradient(160deg, var(--bg1), var(--bg2)) fixed;
+  }
+  h1{font-size:26px;margin:2px 0;font-weight:600;letter-spacing:.5px}
+  .sub{color:var(--dim);font-size:12.5px;margin-bottom:14px}
+  .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:10px;scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{border:1px solid var(--stroke);background:var(--card);color:var(--fg);border-radius:20px;
+        padding:7px 14px;font-size:13px;white-space:nowrap;backdrop-filter:blur(14px)}
+  .chip.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+  .card{background:var(--card);border:1px solid var(--stroke);border-radius:22px;padding:15px 16px 13px;margin-bottom:12px;
+        backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%);
+        box-shadow:0 10px 30px rgba(0,0,0,.18)}
+  .row{display:flex;align-items:center;gap:9px}
+  .name{font-weight:600;font-size:16.5px}
+  .ip{color:var(--dim);font-size:12px;font-family:ui-monospace,monospace;margin-top:2px}
+  .dot{width:8px;height:8px;border-radius:50%;background:#8A93A3;flex:none}
+  .dot.on{background:#38D39F}.dot.off{background:#F2555A}.dot.wait{background:#F5A524}
+  .status{margin-top:8px;font-size:13px;color:var(--dim);white-space:pre-line;min-height:20px}
+  .status b{color:var(--fg)}
+  .acts{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+  button{font:inherit;color:var(--fg);border:1px solid var(--stroke);background:rgba(255,255,255,.10);
+         border-radius:14px;padding:7px 12px;font-size:12.5px;backdrop-filter:blur(10px)}
+  button:active{transform:scale(.97)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-size:16px;
+                 padding:15px;border-radius:18px;width:100%}
+  button.link{background:transparent;border-color:transparent;color:var(--dim)}
+  .fab{position:fixed;left:16px;right:16px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:5}
+  .empty{color:var(--dim);text-align:center;padding:60px 12px;font-size:13.5px;line-height:1.9}
+  .sheet{position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(2px);display:none;align-items:flex-end;z-index:20}
+  .sheet.show{display:flex}
+  .sheet .card{width:100%;margin:0;border-radius:24px 24px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom))}
+  label{display:block;font-size:12px;color:var(--dim);margin:12px 0 5px}
+  input{width:100%;font:inherit;color:var(--fg);background:rgba(255,255,255,.10);border:1px solid var(--stroke);
+        border-radius:14px;padding:12px;backdrop-filter:blur(10px)}
+  input::placeholder{color:var(--dim)}
+  .hint{color:var(--dim);font-size:11.5px;margin-top:6px;line-height:1.5}
+  .sheet .row{gap:9px;margin-top:16px}
+  .sheet .row button{flex:1;padding:13px;font-size:15px}
+  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:86px;background:rgba(0,0,0,.78);color:#fff;
+         padding:10px 15px;border-radius:12px;font-size:13px;opacity:0;transition:.2s;pointer-events:none;max-width:86%;z-index:30}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body data-theme="aurora">
+<h1>家长端</h1>
+<div class="sub">多台电视统一管理 · 同一 Wi-Fi · 只填 IP 和密码</div>
+<div class="chips" id="chips"></div>
+<div id="list"></div>
+<div class="fab"><button class="primary" id="addBtn">＋  添加设备</button></div>
+
+<div class="sheet" id="sheet">
+  <div class="card">
+    <div class="name" id="sheetTitle">添加设备</div>
+    <label>名称</label>
+    <input id="fName" placeholder="客厅电视">
+    <label>电视 IP</label>
+    <input id="fHost" placeholder="192.168.8.192" inputmode="url" autocapitalize="off" autocomplete="off">
+    <label>家长密码</label>
+    <input id="fPass" type="password" placeholder="电视上设置的密码">
+    <div class="hint">保存后直接进入这台电视的控制页面，端口和路径都不用填。</div>
+    <div class="row">
+      <button id="cancelBtn">取消</button>
+      <button class="primary" id="saveBtn" style="width:auto;padding:13px;font-size:15px">保存并进入</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+  var KEY = 'parent-console.devices.v2', TKEY = 'parent-console.theme';
+  var devices = [], editing = null;
+  var $ = function (id) { return document.getElementById(id); };
+  var THEMES = [['aurora', '极光'], ['midnight', '夜幕'], ['mist', '晨雾']];
+
+  function load() { try { devices = JSON.parse(localStorage.getItem(KEY) || '[]') || []; } catch (e) { devices = []; } }
+  function save() { localStorage.setItem(KEY, JSON.stringify(devices)); }
+  function toast(m) {
+    var t = $('toast'); t.textContent = m; t.classList.add('show');
+    clearTimeout(toast._t); toast._t = setTimeout(function () { t.classList.remove('show'); }, 2000);
+  }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function bare(h) { return (h || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/:\d+$/, ''); }
+  function uid() { return Math.random().toString(36).slice(2, 9); }
+
+  function applyTheme(id) {
+    document.body.dataset.theme = id;
+    localStorage.setItem(TKEY, id);
+    renderChips();
+  }
+  function renderChips() {
+    var cur = localStorage.getItem(TKEY) || 'aurora';
+    $('chips').innerHTML = THEMES.map(function (t) {
+      return '<button class="chip' + (t[0] === cur ? ' on' : '') + '" data-theme="' + t[0] + '">' + t[1] + '</button>';
+    }).join('');
+  }
+
+  function api(d, path, method, body, token, timeout) {
+    var ctl = new AbortController();
+    var timer = setTimeout(function () { ctl.abort(); }, timeout || 8000);
+    var headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    return fetch('http://' + bare(d.host) + ':8099' + path, {
+      method: method || 'GET', headers: headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      cache: 'no-store', signal: ctl.signal
+    }).then(function (r) {
+      return r.text().then(function (txt) {
+        var j = null; try { j = txt ? JSON.parse(txt) : null; } catch (e) { j = null; }
+        if (!r.ok || (j && j.error)) {
+          var err = new Error((j && (j.message || j.error)) || ('HTTP ' + r.status));
+          err.status = r.status; throw err;
+        }
+        return j;
+      });
+    }).finally(function () { clearTimeout(timer); });
+  }
+
+  function login(d) {
+    if (!d.pass) return Promise.resolve(null);
+    return api(d, '/api/auth', 'POST', { passphrase: d.pass, remember: true }).then(function (res) {
+      var t = res && res.token;
+      if (t) { d.token = t; save(); }
+      return t || null;
+    });
+  }
+
+  function fmt(sec) {
+    sec = Math.max(0, Math.floor(sec || 0));
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
+    return h ? h + ' 小时 ' + m + ' 分' : m + ' 分钟';
+  }
+
+  function render() {
+    var list = $('list');
+    if (!devices.length) {
+      list.innerHTML = '<div class="empty">还没有设备<br>点下面的「添加设备」<br>填电视 IP 和家长密码即可</div>';
+      return;
+    }
+    list.innerHTML = devices.map(function (d) {
+      return '<div class="card" data-id="' + d.id + '">' +
+        '<div class="row"><span class="dot" id="dot-' + d.id + '"></span>' +
+        '<span class="name">' + esc(d.name) + '</span></div>' +
+        '<div class="ip">' + esc(bare(d.host)) + '</div>' +
+        '<div class="status" id="st-' + d.id + '">未连接</div>' +
+        '<div class="acts">' +
+        '<button data-act="refresh" data-id="' + d.id + '">刷新</button>' +
+        '<button data-act="unlock" data-id="' + d.id + '">解锁 30 分</button>' +
+        '<button data-act="lock" data-id="' + d.id + '">锁定</button>' +
+        '<button data-act="open" data-id="' + d.id + '">控制页</button>' +
+        '<button class="link" data-act="edit" data-id="' + d.id + '">编辑</button>' +
+        '<button class="link" data-act="del" data-id="' + d.id + '">删除</button>' +
+        '</div></div>';
+    }).join('');
+    devices.forEach(refreshOne);
+  }
+
+  function setDot(d, c) { var e = $('dot-' + d.id); if (e) e.className = 'dot ' + c; }
+  function setStatus(d, h) { var e = $('st-' + d.id); if (e) e.innerHTML = h; }
+
+  function refreshOne(d) {
+    setDot(d, 'wait'); setStatus(d, '连接中…');
+    var p = d.token ? Promise.resolve(d.token) : login(d);
+    p.then(function (t) { return api(d, '/api/state', 'GET', undefined, t); })
+      .then(function (s) { setDot(d, 'on'); showState(d, s); })
+      .catch(function (err) {
+        if (err.status === 401) {
+          d.token = null; save(); setDot(d, 'wait');
+          setStatus(d, d.pass ? '密码不对，或电视上改过密码' : '需要填家长密码');
+          return;
+        }
+        setDot(d, 'off');
+        setStatus(d, '连不上：' + esc(err.message || '网络错误') + '\n确认电视开机且与本机同一 Wi-Fi');
+      });
+  }
+
+  function showState(d, s) {
+    var L = (s && s.learning) || {}, parts = [];
+    if (L.mode === 'unlock') parts.push('已解锁');
+    if (L.mode === 'lock') parts.push('已锁定');
+    if (L.free) parts.push('自由使用');
+    if (typeof L.remainingSeconds === 'number') parts.push('剩余 <b>' + fmt(L.remainingSeconds) + '</b>');
+    setStatus(d, parts.join(' · ') || '在线');
+  }
+
+  function remote(d, action, minutes) {
+    var go = function (t) {
+      return api(d, '/api/remote', 'POST', { action: action, minutes: minutes || 0 }, t).then(function (res) {
+        if (res && res.learning) showState(d, { learning: res.learning });
+        toast(action === 'unlock' ? '已解锁' : action === 'lock' ? '已锁定' : '已执行');
+        setTimeout(function () { refreshOne(d); }, 600);
+      });
+    };
+    var p = d.token ? Promise.resolve(d.token) : login(d);
+    p.then(go).catch(function (err) {
+      if (err.status === 401) { d.token = null; save(); return login(d).then(go); }
+      toast(err.message || '操作失败');
+    });
+  }
+
+  function openPanel(d) { location.href = 'http://' + bare(d.host) + ':8099/admin/'; }
+
+  function openSheet(d) {
+    editing = d || null;
+    $('sheetTitle').textContent = d ? '编辑设备' : '添加设备';
+    $('fName').value = d ? d.name : '';
+    $('fHost').value = d ? bare(d.host) : '';
+    $('fPass').value = d ? (d.pass || '') : '';
+    $('sheet').classList.add('show');
+  }
+  function closeSheet() { $('sheet').classList.remove('show'); }
+
+  document.addEventListener('click', function (e) {
+    var chip = e.target.closest('.chip');
+    if (chip) { applyTheme(chip.dataset.theme); return; }
+    var b = e.target.closest('button[data-act]');
+    if (!b) return;
+    var d = devices.filter(function (x) { return x.id === b.dataset.id; })[0];
+    if (!d) return;
+    var a = b.dataset.act;
+    if (a === 'refresh') refreshOne(d);
+    else if (a === 'unlock') remote(d, 'unlock', 30);
+    else if (a === 'lock') remote(d, 'lock', 0);
+    else if (a === 'open') openPanel(d);
+    else if (a === 'edit') openSheet(d);
+    else if (a === 'del') { if (confirm('删除「' + d.name + '」？')) { devices = devices.filter(function (x) { return x.id !== d.id; }); save(); render(); } }
+  });
+
+  $('addBtn').onclick = function () { openSheet(null); };
+  $('cancelBtn').onclick = closeSheet;
+  $('sheet').onclick = function (e) { if (e.target === $('sheet')) closeSheet(); };
+  $('saveBtn').onclick = function () {
+    var name = $('fName').value.trim();
+    var host = bare($('fHost').value.trim());
+    var pass = $('fPass').value;
+    if (!host) return toast('请填电视 IP');
+    if (!/^[\w.\-]+$/.test(host)) return toast('只填 IP，例如 192.168.8.192');
+    var target;
+    if (editing) { editing.name = name || editing.name; editing.host = host; editing.pass = pass; editing.token = null; target = editing; }
+    else { target = { id: uid(), name: name || host, host: host, pass: pass, token: null }; devices.push(target); }
+    save(); closeSheet(); render();
+    openPanel(target);
+  };
+
+  applyTheme(localStorage.getItem(TKEY) || 'aurora');
+  load(); render();
+})();
+</script>
+</body>
+</html>
