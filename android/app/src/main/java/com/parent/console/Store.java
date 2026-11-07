@@ -31,6 +31,7 @@ public final class Store {
                 d.host = o.optString("host");
                 d.pass = o.optString("pass");
                 d.token = o.optString("token", null);
+                d.lastSeen = o.optLong("lastSeen", 0L);
                 out.add(d);
             }
         } catch (Exception ignored) {
@@ -48,6 +49,7 @@ public final class Store {
                 o.put("host", d.host);
                 o.put("pass", d.pass);
                 o.put("token", d.token == null ? JSONObject.NULL : d.token);
+                o.put("lastSeen", d.lastSeen);
             } catch (Exception ignored) {
             }
             arr.put(o);

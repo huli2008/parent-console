@@ -185,12 +185,9 @@ public class WebActivity extends Activity {
     }
 
     @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (keyCode == KeyEvent.KEYCODE_BACK && web != null && web.canGoBack()) {
-            web.goBack();
-            return true;
-        }
-        return super.onKeyDown(keyCode, event);
+    public void onBackPressed() {
+        // 直接回到设备列表，而不是在网页历史里一层层退。
+        finish();
     }
 
     @Override

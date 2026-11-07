@@ -9,6 +9,7 @@ public class Device {
     public String token;  // cached bearer token
     public String status; // last status text
     public int dot;       // 0 offline, 1 online, 2 unknown/needs password
+    public long lastSeen; // epoch millis of the last successful contact
 
     public String base() {
         String h = host == null ? "" : host.trim();

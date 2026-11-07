@@ -35,7 +35,7 @@ public class MainActivity extends Activity {
     private Backdrop backdrop;
     private FrameLayout root;
     private LinearLayout list;
-    private TextView emptyView;
+    private TextView countView;
 
     @Override
     protected void onCreate(Bundle b) {
@@ -66,14 +66,27 @@ public class MainActivity extends Activity {
         root.addView(page, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
+        LinearLayout bottom = new LinearLayout(this);
+        bottom.setOrientation(LinearLayout.HORIZONTAL);
+        bottom.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView scan = actionButton("扫描", false);
+        scan.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        scan.setOnClickListener(v -> scanLan());
+        LinearLayout.LayoutParams scanLp = new LinearLayout.LayoutParams(dp(92), dp(52));
+        scanLp.rightMargin = dp(10);
+        bottom.addView(scan, scanLp);
+
         TextView add = actionButton("＋  添加设备", true);
         add.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
-        add.setOnClickListener(v -> showEdit(null));
+        add.setOnClickListener(v -> showEdit(null, null));
+        bottom.addView(add, new LinearLayout.LayoutParams(0, dp(52), 1f));
+
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(52));
         lp.setMargins(pad, 0, pad, dp(22));
         lp.gravity = Gravity.BOTTOM;
-        root.addView(add, lp);
+        root.addView(bottom, lp);
 
         setContentView(root);
 
@@ -100,6 +113,7 @@ public class MainActivity extends Activity {
         titleRow.addView(title);
 
         TextView count = new TextView(this);
+        countView = count;
         count.setText("  " + devices.size() + " 台设备");
         count.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
         count.setTextColor(theme.dim);
@@ -155,9 +169,10 @@ public class MainActivity extends Activity {
 
     private void render() {
         list.removeAllViews();
+        if (countView != null) countView.setText("  " + devices.size() + " 台设备");
         if (devices.isEmpty()) {
             TextView e = new TextView(this);
-            e.setText("还没有设备\n\n点右下方的「添加设备」，填电视的 IP（如 192.168.8.192）\n再填电视上设置的家长密码。");
+            e.setText("还没有设备\n\n点左下角「扫描」自动找同一 Wi-Fi 上的电视，\n或点「添加设备」手动填 IP，再填家长密码。");
             e.setTextColor(theme.dim);
             e.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.5f);
             e.setGravity(Gravity.CENTER);
@@ -166,7 +181,43 @@ public class MainActivity extends Activity {
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             return;
         }
+        list.addView(batchRow());
         for (Device d : devices) list.addView(cardFor(d));
+    }
+
+    /** Bulk actions for every configured device. */
+    private View batchRow() {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(0, 0, 0, dp(10));
+        row.addView(chipButton("全部刷新", this::refreshAll));
+        row.addView(chipButton("全部锁定", () -> batch("lock", 0)));
+        row.addView(chipButton("全部解锁 30 分", () -> batch("unlock", 30)));
+        return row;
+    }
+
+    private void batch(String action, int minutes) {
+        int n = 0;
+        for (Device d : devices) {
+            if (d.pass == null || d.pass.isEmpty()) continue;
+            n++;
+            Api.remote(this, d, action, minutes, new Api.Cb() {
+                @Override
+                public void ok(String text) {
+                }
+
+                @Override
+                public void fail(String message, int status) {
+                }
+            });
+        }
+        if (n == 0) {
+            toast("这些设备还没填家长密码");
+            return;
+        }
+        toast("已向 " + n + " 台设备发送");
+        new android.os.Handler(android.os.Looper.getMainLooper())
+                .postDelayed(this::refreshAll, 1200);
     }
 
     private View cardFor(final Device d) {
@@ -215,7 +266,7 @@ public class MainActivity extends Activity {
         card.addView(row);
 
         TextView status = new TextView(this);
-        status.setText(d.status == null ? "未连接" : d.status);
+        status.setText(d.dot == 0 && d.lastSeen > 0 ? (d.status == null ? "未连接" : d.status) + "\n上次在线 " + new java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.getDefault()).format(new java.util.Date(d.lastSeen)) : (d.status == null ? "未连接" : d.status));
         status.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         status.setTextColor(theme.dim);
         status.setPadding(0, dp(7), 0, dp(2));
@@ -295,6 +346,7 @@ public class MainActivity extends Activity {
             public void ok(String text) {
                 d.status = text;
                 d.dot = 1;
+                d.lastSeen = System.currentTimeMillis();
                 Store.save(MainActivity.this, devices);
                 render();
             }
@@ -361,7 +413,70 @@ public class MainActivity extends Activity {
                 .show();
     }
 
+    /** Scans the Wi-Fi for StudyOnTV devices and offers the ones not added yet. */
+    private void scanLan() {
+        final TextView progress = new TextView(this);
+        progress.setText("正在扫描 192.168.x.x …");
+        progress.setTextColor(theme.dim);
+        progress.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        int p = dp(20);
+        progress.setPadding(p, dp(16), p, dp(16));
+
+        final AlertDialog dlg = new AlertDialog.Builder(this)
+                .setTitle("扫描局域网")
+                .setView(progress)
+                .setNegativeButton("取消", null)
+                .create();
+        dlg.show();
+
+        Discovery.scan(this, new Discovery.Cb() {
+            @Override
+            public void onProgress(int scanned, int total, int found) {
+                progress.setText("已扫描 " + scanned + "/" + total
+                        + (found > 0 ? "  ·  发现 " + found + " 台" : " …"));
+            }
+
+            @Override
+            public void onFound(String host) {
+                progress.setText("发现 " + host + " …");
+            }
+
+            @Override
+            public void onFinished(java.util.List<String> hosts) {
+                if (!dlg.isShowing()) return;
+                java.util.List<String> fresh = new java.util.ArrayList<>();
+                for (String h : hosts) {
+                    boolean known = false;
+                    for (Device d : devices) if (h.equals(d.host)) known = true;
+                    if (!known) fresh.add(h);
+                }
+                dlg.dismiss();
+                if (fresh.isEmpty()) {
+                    toast(hosts.isEmpty() ? "没有发现设备：确认电视开机、与本机同一 Wi-Fi"
+                            : "发现的设备都已添加");
+                    return;
+                }
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle("发现 " + fresh.size() + " 台设备")
+                        .setItems(fresh.toArray(new String[0]),
+                                (d2, which) -> showEdit(null, fresh.get(which)))
+                        .setNegativeButton("关闭", null)
+                        .show();
+            }
+
+            @Override
+            public void onError(String message) {
+                if (dlg.isShowing()) dlg.dismiss();
+                toast(message);
+            }
+        });
+    }
+
     private void showEdit(final Device existing) {
+        showEdit(existing, null);
+    }
+
+    private void showEdit(final Device existing, final String presetHost) {
         final boolean isNew = existing == null;
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
@@ -385,7 +500,7 @@ public class MainActivity extends Activity {
 
         final EditText host = new EditText(this);
         host.setHint("192.168.8.192");
-        host.setText(existing == null ? "" : existing.host);
+        host.setText(existing != null ? existing.host : (presetHost == null ? "" : presetHost));
         host.setSingleLine(true);
         host.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         host.setTextColor(theme.text);
