@@ -68,14 +68,14 @@ StudyOnTV 的家长面板由**被控设备自己**在 `:8099` 上提供。管理
 
 ## 下载安装
 
-**[⬇ parent-console-v0.3.0.apk](releases/parent-console-v0.3.0.apk)**（约 480 KB，已签名）
-直达链接：<https://github.com/huli2008/parent-console/raw/main/releases/parent-console-v0.3.0.apk>
+**[⬇ parent-console-v0.3.1.apk](releases/parent-console-v0.3.1.apk)**（约 480 KB，已签名）
+直达链接：<https://github.com/huli2008/parent-console/raw/main/releases/parent-console-v0.3.1.apk>
 
 传到手机安装（自签名，安装时选择「仍要安装」）。
 
 首次打开：点「扫描」自动发现设备，或点「添加设备」手动填 IP（例如 `192.168.8.192`）和家长密码 → 「保存并进入」。
 
-> v0.2.2 仍保留在 `releases/` 目录；v0.3.0 起支持局域网自动发现。
+> 历史版本仍保留在 `releases/` 目录；v0.3.0 起支持局域网自动发现，v0.3.1 修正顶部设备计数。
 
 > 手机与电视必须在**同一个 Wi-Fi**。被控设备需要先装好 StudyOnTV，并在首次使用时设置过家长密码。
 
