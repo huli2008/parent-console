@@ -25,6 +25,35 @@ StudyOnTV 的家长面板由**被控设备自己**在 `:8099` 上提供。管理
 
 「家长端」把地址拼接、密码登录、面板会话全部内置：**只填 IP 和家长密码，保存后直接落在控制页**。
 
+## 截图
+
+<div align="center">
+
+<table>
+<tr>
+<td align="center" width="50%">
+<img src="docs/screenshots/01-main.jpg" width="280" alt="设备列表"><br>
+<sub><b>设备列表</b> · 多台电视、在线状态、快捷解锁/锁定</sub>
+</td>
+<td align="center" width="50%">
+<img src="docs/screenshots/02-discover.jpg" width="280" alt="自动发现"><br>
+<sub><b>自动发现</b> · 扫描同一 Wi-Fi，列出装了 StudyOnTV 的电视</sub>
+</td>
+</tr>
+<tr>
+<td align="center" width="50%">
+<img src="docs/screenshots/03-add.jpg" width="280" alt="添加设备"><br>
+<sub><b>添加设备</b> · 只填 IP 和家长密码，端口路径都内置</sub>
+</td>
+<td align="center" width="50%">
+<img src="docs/screenshots/04-panel.jpg" width="280" alt="控制页"><br>
+<sub><b>控制页</b> · 点卡片直达设备自己的家长面板，无需二次登录</sub>
+</td>
+</tr>
+</table>
+
+</div>
+
 ## 功能
 
 - **自动发现**：点一下「扫描」，自动列出同一 Wi-Fi 上装了 StudyOnTV 的电视，选一台填密码即可添加。
