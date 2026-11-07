@@ -1,10 +1,10 @@
-# build output
+﻿# build output
 android/build/
 android/.gradle/
 android/local.properties
 dist/
 
-# signing material — never commit
+# signing material 鈥?never commit
 *.jks
 *.keystore
 keystore.jks
@@ -18,3 +18,6 @@ keystore.jks
 *.iml
 Thumbs.db
 .DS_Store
+
+# the published APK lives here (GitHub uploads host is unreachable from the build machine)
+!releases/*.apk
