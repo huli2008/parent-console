@@ -21,3 +21,4 @@ Thumbs.db
 
 # the published APK lives here (GitHub uploads host is unreachable from the build machine)
 !releases/*.apk
+*.idsig
