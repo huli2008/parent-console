@@ -1,30 +1,41 @@
 package com.parent.console;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.view.KeyEvent;
+import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.TextView;
+import android.widget.Toast;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.FrameLayout;
-import android.widget.ProgressBar;
 
 import org.json.JSONObject;
 
 import java.io.ByteArrayInputStream;
 
 /**
- * Opens the device's panel at http://<ip>:8099/admin/ and injects the session the panel expects
- * (localStorage "sotv-panel-session" = {host, token}) so the user lands on the控制页面 directly
- * instead of the panel's own login screen.
+ * 设备控制页：内嵌设备自带的家长面板，并提供返回 / 主页 / 刷新 / 菜单工具栏。
+ * 打开前用已保存的密码换 token，并注入面板自己的会话（localStorage "sotv-panel-session"）。
  */
 public class WebActivity extends Activity {
 
@@ -37,6 +48,7 @@ public class WebActivity extends Activity {
     private String pass;
     private volatile boolean bootstrapped = false;
     private volatile boolean recovered = false;
+    private final Handler ui = new Handler(Looper.getMainLooper());
 
     @Override
     protected void onCreate(Bundle b) {
@@ -52,22 +64,44 @@ public class WebActivity extends Activity {
             d.host = host;
             d.pass = pass;
             new Thread(() -> {
+                String t = null;
                 try {
-                    String t = Api.token(d);
-                    new Handler(Looper.getMainLooper()).post(() -> {
-                        token = t;
-                        buildAndLoad();
-                    });
-                } catch (Exception e) {
-                    new Handler(Looper.getMainLooper()).post(this::buildAndLoad);
+                    t = Api.token(d);
+                } catch (Exception ignored) {
                 }
+                final String ft = t;
+                ui.post(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    if (ft != null) token = ft;
+                    buildAndLoad();
+                });
             }).start();
             return;
         }
         buildAndLoad();
     }
 
+    private String panelUrl() {
+        return "http://" + host + ":8099/admin/";
+    }
+
     private void buildAndLoad() {
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(theme.bgBottom);
+
+        page.addView(buildToolbar());
+
+        final ProgressBar progress = new ProgressBar(this, null,
+                android.R.attr.progressBarStyleHorizontal);
+        progress.setMax(100);
+        GradientDrawable pb = new GradientDrawable();
+        pb.setColor(theme.accent);
+        progress.setProgressDrawable(pb);
+        progress.setVisibility(View.GONE);
+        page.addView(progress, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(3)));
+
         web = new WebView(this);
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
@@ -102,14 +136,15 @@ public class WebActivity extends Activity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                // 面板若仍停在登录页：补一次会话，必要时把密码也填好（端口/路径都是固定的，无需手填）。
+                if (url == null || !url.contains(":8099")) return;
                 if (token != null && !token.isEmpty() && !recovered) {
                     recovered = true;
                     String js = "!!localStorage.getItem(" + JSONObject.quote(SESSION_KEY) + ")";
                     view.evaluateJavascript(js, value -> {
+                        if (isFinishing()) return;
                         if (!"true".equals(value)) {
                             view.evaluateJavascript(bootstrapJs(), null);
-                            view.loadUrl("http://" + host + ":8099/admin/");
+                            view.loadUrl(panelUrl());
                             return;
                         }
                         view.evaluateJavascript(prefillJs(), null);
@@ -120,32 +155,98 @@ public class WebActivity extends Activity {
             }
         });
 
-        final ProgressBar bar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-        bar.setMax(100);
-        GradientDrawable pb = new GradientDrawable();
-        pb.setColor(theme.accent);
-        bar.setProgressDrawable(pb);
-        bar.setVisibility(View.GONE);
-
         web.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onProgressChanged(WebView view, int p) {
-                bar.setProgress(p);
-                bar.setVisibility(p >= 100 ? View.GONE : View.VISIBLE);
+                progress.setProgress(p);
+                progress.setVisibility(p >= 100 ? View.GONE : View.VISIBLE);
             }
         });
 
-        FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(theme.bgBottom);
-        root.addView(web, new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-        FrameLayout.LayoutParams barLp = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, dp(3));
-        barLp.gravity = android.view.Gravity.TOP;
-        root.addView(bar, barLp);
-        setContentView(root);
+        page.addView(web, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        setContentView(page);
+        web.loadUrl(panelUrl());
+    }
 
-        web.loadUrl("http://" + host + ":8099/admin/");
+    /** 顶部工具栏：返回 · 主页 · 刷新 · 菜单 */
+    private View buildToolbar() {
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(dp(10), dp(6), dp(10), dp(6));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(theme.card);
+        bar.setBackground(bg);
+
+        TextView back = barButton("‹ 返回");
+        back.setOnClickListener(v -> finish());
+        bar.addView(back);
+
+        TextView home = barButton("主页");
+        home.setOnClickListener(v -> {
+            if (web != null) web.loadUrl(panelUrl());
+        });
+        bar.addView(home);
+
+        TextView reload = barButton("刷新");
+        reload.setOnClickListener(v -> {
+            if (web != null) web.reload();
+        });
+        bar.addView(reload);
+
+        LinearLayout spacer = new LinearLayout(this);
+        bar.addView(spacer, new LinearLayout.LayoutParams(0, 1, 1f));
+
+        TextView title = new TextView(this);
+        title.setText(host);
+        title.setTextColor(theme.dim);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        title.setSingleLine(true);
+        bar.addView(title);
+
+        LinearLayout spacer2 = new LinearLayout(this);
+        bar.addView(spacer2, new LinearLayout.LayoutParams(0, 1, 1f));
+
+        TextView more = barButton("⋯");
+        more.setOnClickListener(v -> showMenu());
+        bar.addView(more);
+        return bar;
+    }
+
+    private TextView barButton(String label) {
+        TextView b = new TextView(this);
+        b.setText(label);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        b.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        b.setTextColor(theme.text);
+        b.setPadding(dp(10), dp(7), dp(10), dp(7));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(dp(12));
+        bg.setColor(theme.light ? Color.parseColor("#66FFFFFF") : Color.parseColor("#22FFFFFF"));
+        b.setBackground(bg);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.rightMargin = dp(8);
+        b.setLayoutParams(lp);
+        return b;
+    }
+
+    private void showMenu() {
+        String[] items = {"在浏览器打开", "复制地址", "回到设备列表"};
+        new AlertDialog.Builder(this)
+                .setItems(items, (dlg, which) -> {
+                    if (which == 0) {
+                        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(panelUrl())));
+                    } else if (which == 1) {
+                        ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                        if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("url", panelUrl()));
+                        Toast.makeText(this, "已复制 " + panelUrl(), Toast.LENGTH_SHORT).show();
+                    } else {
+                        finish();
+                    }
+                })
+                .show();
     }
 
     private String bootstrapJs() {
@@ -153,7 +254,7 @@ public class WebActivity extends Activity {
                 + "JSON.stringify({host:location.host,token:" + JSONObject.quote(token) + "}));";
     }
 
-    /** Fills the panel's password field when it still shows its login screen. */
+    /** 面板仍停在登录页时，把密码填进输入框（地址已是当前页）。 */
     private String prefillJs() {
         if (pass == null || pass.isEmpty()) return "(function(){})()";
         return "(function(){try{var i=document.querySelector('input[type=password]');if(!i)return;"
@@ -184,9 +285,9 @@ public class WebActivity extends Activity {
         return Math.round(getResources().getDisplayMetrics().density * v);
     }
 
+    /** 系统返回键 / 手势：直接回到设备列表（页面内导航用工具栏的返回）。 */
     @Override
     public void onBackPressed() {
-        // 直接回到设备列表，而不是在网页历史里一层层退。
         finish();
     }
 
