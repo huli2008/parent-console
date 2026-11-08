@@ -199,8 +199,7 @@ public class MainActivity extends Activity {
     private void batch(String action, int minutes) {
         int n = 0;
         for (Device d : devices) {
-            boolean hasAuth = (d.pass != null && !d.pass.isEmpty()) || (d.token != null && !d.token.isEmpty());
-            if (!hasAuth) continue;
+            if (d.pass == null || d.pass.isEmpty()) continue;
             n++;
             Api.remote(this, d, action, minutes, new Api.Cb() {
                 @Override
